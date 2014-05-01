@@ -46,6 +46,7 @@ public class ServerClass implements Runnable {
 		return uriBuilder.build();
 	}
 
+	@SuppressWarnings("resource")
 	@Override
 	public void run() {
 		Socket clientSocket = null;
@@ -80,61 +81,85 @@ public class ServerClass implements Runnable {
 				}
 				if (obj.getMessageType() == Message.QUERY) {
 					Log.d(TAG, "query in server task, key: " + obj.getKey());
-					Cursor resultCursor = mContentResolver.query(mUri, null,
-							obj.getKey(), null, "DES");
-					System.out.println("cursor size: "
-							+ resultCursor.getCount() + " from port "
-							+ obj.getFromPort());
-					String returnValue = "";
-
-					int valueIndex = resultCursor.getColumnIndex(VALUE_FIELD);
-					if (resultCursor.getCount() > 0) {
-						resultCursor.moveToFirst();
-						returnValue = resultCursor.getString(valueIndex);
-						Log.d(TAG,
-								"Returning the result to: " + obj.getFromPort()
-										+ "value: " + returnValue);
-					}
-
-					final Message msgToSend = new Message();
-					msgToSend.setMessageType(Message.QUERY_RESULT);
-					msgToSend.setKey(obj.getKey());
-					msgToSend.setValue(returnValue);
-					msgToSend.setFromPort(obj.getFromPort());
+					
+					
+					
 					Thread t = new Thread() {
-						private Message msgToSend;
-
+						Message obj;
 						private Thread init(Message temp) {
-							msgToSend = temp;
+							obj = temp;
 							return this;
 						}
-
-						public void run() {
-							try {
-								Log.d(TAG, "");
-								Socket socket = null;
-								socket = new Socket(
-										InetAddress.getByAddress(new byte[] {
-												10, 0, 2, 2 }),
-										Integer.parseInt(msgToSend
-												.getFromPort()));
-								if (socket.isConnected()) {
-									ObjectOutputStream outToClient = new ObjectOutputStream(
-											socket.getOutputStream());
-									outToClient.writeObject(msgToSend);
-									socket.close();
-								}
-							} catch (UnknownHostException e) {
-								Log.e(TAG, "ClientTask UnknownHostException");
-							} catch (IOException e) {
-								Log.e(TAG,
-										"ClientTask socket IOException"
-												+ e.toString());
+					    public void run() {
+					    	Cursor resultCursor = mContentResolver.query(mUri, null,
+									obj.getKey(), null, "DES");
+					    	
+							while(resultCursor.getCount() < 1)
+							{
+								Log.d(TAG,"waiting for result");
+								resultCursor = mContentResolver.query(mUri, null,
+										obj.getKey(), null, "DES");
 							}
-						}
-					}.init(msgToSend);
+							System.out.println("cursor size: "
+									+ resultCursor.getCount() + " from port "
+									+ obj.getFromPort());
+							String returnValue = "";
+
+							int valueIndex = resultCursor.getColumnIndex(VALUE_FIELD);
+							//if (resultCursor.getCount() > 0) {
+								resultCursor.moveToFirst();
+								returnValue = resultCursor.getString(valueIndex);
+								Log.d(TAG,
+										"Returning the result to: " + obj.getFromPort()
+												+ "value: " + returnValue);
+							//}
+							Log.d(TAG,
+									"Returning the result to: " + obj.getFromPort()
+											+ "value: " + returnValue);
+							final Message msgToSend = new Message();
+							msgToSend.setMessageType(Message.QUERY_RESULT);
+							msgToSend.setKey(obj.getKey());
+							msgToSend.setValue(returnValue);
+							msgToSend.setFromPort(obj.getFromPort());
+							Thread t = new Thread() {
+								private Message msgToSend;
+
+								private Thread init(Message temp) {
+									msgToSend = temp;
+									return this;
+								}
+
+								public void run() {
+									try {
+										Log.d(TAG, "");
+										Socket socket = null;
+										socket = new Socket(
+												InetAddress.getByAddress(new byte[] {
+														10, 0, 2, 2 }),
+												Integer.parseInt(msgToSend
+														.getFromPort()));
+										if (socket.isConnected()) {
+											ObjectOutputStream outToClient = new ObjectOutputStream(
+													socket.getOutputStream());
+											outToClient.writeObject(msgToSend);
+											socket.close();
+										}
+									} catch (UnknownHostException e) {
+										Log.e(TAG, "ClientTask UnknownHostException");
+									} catch (IOException e) {
+										Log.e(TAG,
+												"ClientTask socket IOException"
+														+ e.toString());
+									}
+								}
+							}.init(msgToSend);
+							t.start();
+							resultCursor.close();
+					    }
+					}.init(obj);
+					
 					t.start();
-					resultCursor.close();
+					
 				}
 				if (obj.getMessageType() == Message.QUERY_RESULT) {
 					Log.d(TAG, "Recieved the query result: " + obj.getKey());

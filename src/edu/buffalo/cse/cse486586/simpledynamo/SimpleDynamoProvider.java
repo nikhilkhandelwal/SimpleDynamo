@@ -27,7 +27,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public static final String VALUE_FIELD = "value";
 	public static final String DB_NAME = "simpledht.db";
 	public static final String TABLE_NAME = "messages";
-	public static final int DB_VERSION = 96;
+	public static final int DB_VERSION = 99;
 	private final Uri mUri = buildUri("content",
 			"edu.buffalo.cse.cse486586.simpledynamo.provider");
 	private DBHelper dbHelper;
@@ -243,158 +243,160 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return false;
 	}
 
-	@SuppressWarnings("resource")
 	@Override
-	public Cursor query(Uri uri, String[] projection, String selection,
-			String[] selectionArgs, String sortOrder) {
-		// TODO Auto-generated method stub
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+            String sortOrder) {
+        // TODO Auto-generated method stub
 		Cursor cursor;
-		Log.d(TAG, "inside query : " + selection);
-		final String[] temp = { selection };
-		db = dbHelper.getReadableDatabase();
-		if (selection.compareTo("@") == 0) {
-			// cursor=db.query(TABLE_NAME, projection, null, null , null, null,
-			// null);
-			cursor = db.query(TABLE_NAME, null, null, null, null, null, null);
-
-			return cursor;
-		}
-		if (selection.compareTo("*") == 0) {
-			ArrayList<Message> globalDump = new ArrayList<Message>();
-			cursor = db.query(TABLE_NAME, projection, null, null, null, null,
-					null);
-			int keyIndex = cursor.getColumnIndex(KEY_FIELD);
-			int valueIndex = cursor.getColumnIndex(VALUE_FIELD);
-			cursor.moveToFirst();
-			while (cursor.isAfterLast() == false) {
-				Message msg = new Message();
-				msg.setKey(cursor.getString(keyIndex));
-				msg.setValue(cursor.getString(valueIndex));
-				globalDump.add(msg);
-				cursor.moveToNext();
-			}
-			final Message globalQuery = new Message();
-			globalQuery.setGlobalQuery(globalDump);
-			globalQuery.setMessageType(Message.QUERY_GLOBAL);
-			globalQuery.setFromPort(((SimpleDynamoApplication) getContext()
-					.getApplicationContext()).myPort);
-			globalQuery.setSendToPort(((SimpleDynamoApplication) getContext()
-					.getApplicationContext()).getSuccessor());
-			Thread t = new Thread() {
-				public void run() {
-					try {
-						Log.d(TAG, "Routing Query to next machine");
-						Socket socket = null;
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }),
-								Integer.parseInt(((SimpleDynamoApplication) getContext()
-										.getApplicationContext())
-										.getSuccessor()));
-						if (socket.isConnected()) {
+    	Log.d(TAG, "inside query : "+selection);
+    	final String [] temp = {selection};
+     	db = dbHelper.getReadableDatabase();
+    		if(selection.compareTo("@")==0 )
+    		{
+    			//cursor=db.query(TABLE_NAME, projection, null, null , null, null, null);
+    			cursor=db.query(TABLE_NAME, null, null, null , null, null, null);
+    			
+    			return cursor;
+    		}
+    		if(selection.compareTo("*")==0 )
+    		{
+    			ArrayList<Message> globalDump = new ArrayList<Message>();
+    			cursor=db.query(TABLE_NAME, projection, null, null , null, null, null);
+    			int keyIndex = cursor.getColumnIndex(KEY_FIELD);
+				int valueIndex = cursor.getColumnIndex(VALUE_FIELD);
+				cursor.moveToFirst();
+    			while(cursor.isAfterLast() == false){
+    				Message msg = new Message();
+    				msg.setKey(cursor.getString(keyIndex));
+					msg.setValue(cursor.getString(valueIndex));
+					globalDump.add(msg);
+			        cursor.moveToNext();
+			    }
+    			final Message globalQuery =  new Message();
+    			globalQuery.setGlobalQuery(globalDump);
+    			globalQuery.setMessageType(Message.QUERY_GLOBAL);
+    			globalQuery.setFromPort(((SimpleDynamoApplication) getContext().getApplicationContext()).myPort);
+    			globalQuery.setSendToPort(((SimpleDynamoApplication) getContext().getApplicationContext()).getSuccessor());
+    			Thread t = new Thread() {
+				    public void run() {
+				    	try {
+							Log.d(TAG, "Routing Query to another machine");
+							Socket socket = null;
+							socket = new Socket(InetAddress.getByAddress(new byte[] { 10,
+									0, 2, 2 }), Integer.parseInt(((SimpleDynamoApplication) getContext()
+											.getApplicationContext()).getSuccessor()));
+							if(socket.isConnected())
+							{
 							ObjectOutputStream outToClient = new ObjectOutputStream(
 									socket.getOutputStream());
 							outToClient.writeObject(globalQuery);
 							socket.close();
+							}
+						} catch (UnknownHostException e) {
+							Log.e(TAG, "ClientTask UnknownHostException");
+						} catch (IOException e) {
+							Log.e(TAG, "ClientTask socket IOException" + e.toString());
 						}
-					} catch (UnknownHostException e) {
-						Log.e(TAG, "ClientTask UnknownHostException");
-					} catch (IOException e) {
-						Log.e(TAG,
-								"ClientTask socket IOException" + e.toString());
-					}
-					while (((SimpleDynamoApplication) getContext()
-							.getApplicationContext()).waitingForCursor) {
-						Log.d(TAG, "In while loop");
-						try {
-							sleep(1000);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
-
+				    	while(((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor)
+				    	{
+				    		Log.d(TAG, "In while loop");
+				    		try {
+								sleep(10);
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+				    	}
+				    	
+				    	
+				    }
+				};
+				t.start();
+				try {
+					t.join();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
-			};
-			t.start();
-			try {
-				t.join();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				Log.d(TAG, "In updating global cursor");
+				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
+				return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
 			}
-			Log.d(TAG, "In updaing global cursor");
-			((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor = true;
-			return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
-		}
-
-		cursor = db.query(TABLE_NAME, projection, "key=?", temp, null, null,
-				null);
-
-		if (sortOrder == null && cursor.getCount() < 1) {
-	//	if(!correctNodePort(temp[0]).equals(((SimpleDynamoApplication) getContext().getApplicationContext()).myPort)){
+    			
+    	cursor=db.query(TABLE_NAME, projection, "key=?"	, temp , null, null, null);
+		
+		if(sortOrder==null&& cursor.getCount() < 1)
+		{
 			final Message msgToSend = new Message();
 			msgToSend.setMessageType(Message.QUERY);
 			msgToSend.setKey(selection);
 			msgToSend.setValue("");
 			msgToSend.setFromPort(((SimpleDynamoApplication) getContext()
-					.getApplicationContext()).myPort);
-			Thread t = new Thread() {
-				public void run() {
-					try {
-						Log.d(TAG, "Routing Query to another machine");
-						Socket socket = null;
-						socket = new Socket(
-								InetAddress.getByAddress(new byte[] { 10, 0, 2,
-										2 }),Integer.parseInt(correctNodePort(temp[0])));
-						if (socket.isConnected()) {
+						.getApplicationContext()).myPort );
+				Thread t = new Thread() {
+				    public void run() {
+				    	try {
+							Log.d(TAG, "Routing Query to another machine");
+							Socket socket = null;
+							socket = new Socket(InetAddress.getByAddress(new byte[] { 10,
+									0, 2, 2 }), Integer.parseInt(correctNodePort(temp[0])));
+							if(socket.isConnected())
+							{
 							ObjectOutputStream outToClient = new ObjectOutputStream(
 									socket.getOutputStream());
 							outToClient.writeObject(msgToSend);
 							socket.close();
+							}
+						} catch (UnknownHostException e) {
+							Log.e(TAG, "ClientTask UnknownHostException");
+						} catch (IOException e) {
+							Log.e(TAG, "ClientTask socket IOException" + e.toString());
 						}
-					} catch (UnknownHostException e) {
-						Log.e(TAG, "ClientTask UnknownHostException");
-					} catch (IOException e) {
-						Log.e(TAG,
-								"ClientTask socket IOException" + e.toString());
+				    	/*while(((SimpleDhtApplication) getContext().getApplicationContext()).waitingForCursor)
+				    	{
+				    		Log.d(TAG, "In while loop");
+				    		try {
+								sleep(10);
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+				    	}*/
+				    	
+				    	
+				    }
+				};
+				t.start();
+				
+				/*try {
+					t.join();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}*/
+				synchronized(this){
+				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
+		    	while(((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor)
+		    	{
+		    		Log.d(TAG, "In while loop");
+		    		try {
+						 Thread.sleep(10);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
 					}
-					int counter =0;
-							((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor = true;
-							while (((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor&& counter<100) {
-								Log.d(TAG, "In while loop");
-								counter++;
-								try {
-									Thread.sleep(100);
-								} catch (InterruptedException e) {
-									// TODO Auto-generated catch block
-									e.printStackTrace();
-								}
-				             }
-							
+		    	}
+				Log.d(TAG, "In updating gobal cursor");
+				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
+				return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
 				}
-			};
-			t.start();
-			try {
-				t.join();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
-            Log.d(TAG, "In updating gobal cursor");
-			((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor = true;
-			return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
-		} else {
-			Log.d(TAG, "returning local cursor ");
-					
-					cursor=db.query(TABLE_NAME, projection, "key=?", temp, null, null,
-							null);
-					
-			Log.d(TAG, "recieved result");
-			return cursor;
-
-		}
-	}
+			else
+			{
+				Log.d(TAG, "returning local cursor ");
+				return cursor;
+			}
+    }
 
 	@Override
 	public int update(Uri uri, ContentValues values, String selection,
