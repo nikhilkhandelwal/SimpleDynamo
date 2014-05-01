@@ -283,6 +283,7 @@ public class ServerClass implements Runnable {
 					mContentResolver.delete(mUri, "@", null);
 				}
 
+				
 			} catch (IOException e) {
 				e.printStackTrace();
 			}

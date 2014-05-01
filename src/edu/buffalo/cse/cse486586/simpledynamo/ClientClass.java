@@ -30,11 +30,10 @@ public class ClientClass implements Runnable {
 			
 			socket.close();
 			}
-		} catch (UnknownHostException e) {
-			Log.e(TAG, "ClientTask UnknownHostException");
 		} catch (IOException e) {
-			Log.e(TAG, "ClientTask socket IOException" + e.toString());
-		}
+			Log.e(TAG, "ClientTask UnknownHostException");
+		} 
+		throw new RuntimeException();
 	}
 
 	}

@@ -189,6 +189,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 		// TODO Auto-generated method stub
 		long id = 0;
 		int index = nodesList.indexOf(String.valueOf((Integer.parseInt(primaryNode)/2)));
+		Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+		    public void uncaughtException(Thread th, Throwable ex) {
+		        System.out.println("Caught exception in provider " + ex);
+		    }
+		};
 		for (int i = 0; i < 3; i++) {
 			Log.d(TAG,"sent to port: "+String.valueOf(Integer.parseInt(nodesList.get(index % nodesList.size()))*2)+"index: "+index);
 			Message msgToSend = new Message();
@@ -202,6 +207,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			Runnable task = new ClientClass(msgToSend);
 			Thread t = new Thread(task);
 			t.start();
+			t.setUncaughtExceptionHandler(h);
 		}
 		return id;
 
@@ -322,8 +328,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
 				return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
 			}
+    		synchronized(this){
     			
     	cursor=db.query(TABLE_NAME, projection, "key=?"	, temp , null, null, null);
+    		}
 		
 		if(sortOrder==null&& cursor.getCount() < 1)
 		{
