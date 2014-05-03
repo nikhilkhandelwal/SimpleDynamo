@@ -18,6 +18,8 @@ public class Message implements Serializable {
 	public static final int QUERY_GLOBAL=6;
 	public static final int DELETE_GLOBAL=7;
 	public static final int DELETE=8;
+	public static final int RECOVERY_DATA=9;
+	public static final int RECOVERY_DATA_REPLY=10;
 	private int messageType=-1;
 	private String value;
 	private String key;

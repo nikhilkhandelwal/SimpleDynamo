@@ -52,8 +52,8 @@ public class SimpleDynamoActivity extends Activity {
        */
         findViewById(R.id.button2).setOnClickListener(
                 new OnTestLocalClickListener(tv, getContentResolver())); 
-       /* findViewById(R.id.button2).setOnClickListener(
-                new OnTestGlobalClickListener(tv, getContentResolver()));*/
+        findViewById(R.id.button4).setOnClickListener(
+                new OnTestGlobalClickListener(tv, getContentResolver()));
         mUri = buildUri("content", "edu.buffalo.cse.cse486586.simpledynamo.provider");
 /*        findViewById(R.id.button4).setOnClickListener( new OnClickListener() {
 			@Override

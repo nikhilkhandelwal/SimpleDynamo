@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Formatter;
 
+import org.w3c.dom.NodeList;
+
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Context;
@@ -27,12 +29,14 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public static final String VALUE_FIELD = "value";
 	public static final String DB_NAME = "simpledht.db";
 	public static final String TABLE_NAME = "messages";
-	public static final int DB_VERSION = 99;
+	public static final int DB_VERSION = 114;
 	private final Uri mUri = buildUri("content",
 			"edu.buffalo.cse.cse486586.simpledynamo.provider");
-	private DBHelper dbHelper;
-	private SQLiteDatabase db;
-	ArrayList<String> nodesList = new ArrayList<String>();
+	private static DBHelper dbHelper;
+	private  SQLiteDatabase db;
+	public static  SQLiteDatabase writableDb;
+	public  static SQLiteDatabase readableDb;
+	static ArrayList<String> nodesList = new ArrayList<String>();
 
 	private Uri buildUri(String scheme, String authority) {
 		Uri.Builder uriBuilder = new Uri.Builder();
@@ -44,21 +48,27 @@ public class SimpleDynamoProvider extends ContentProvider {
 	@Override
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
 		// TODO Auto-generated method stub
-		String [] temp = {selection};
+		//String [] temp = {selection};
 		db = dbHelper.getReadableDatabase();
+		Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+		    public void uncaughtException(Thread th, Throwable ex) {
+		        System.out.println("Caught exception in provider " + ex);
+		    }
+		};
     	
     	if(selection.compareTo("*")==0 || selection.compareTo("@")==0)
     	{
     		if(selection.compareTo("@")==0 )
     		{
+    			Log.d(TAG, "delete local");
     			db.delete(TABLE_NAME,null,null);
     		}
     		if(selection.compareTo("*")==0 )
     		{
     			Log.d(TAG, "* Delete at : "+((SimpleDynamoApplication) getContext()
 						.getApplicationContext()).myPort);
-    			db.delete(TABLE_NAME, null, null);
-    			final Message msgToSend = new Message();
+    		db.delete(TABLE_NAME, null, null);
+    			/*final Message msgToSend = new Message();
     			msgToSend.setMessageType(Message.DELETE_GLOBAL);
     			msgToSend.setKey("");
     			msgToSend.setValue("");
@@ -83,16 +93,52 @@ public class SimpleDynamoProvider extends ContentProvider {
     							Log.e(TAG, "ClientTask UnknownHostException");
     						} catch (IOException e) {
     							Log.e(TAG, "ClientTask socket IOException" + e.toString());
+    							
     						}
     				    	
     				    }
     				};
-    				t.start();
+    				t.start();*/
+    			
+    		/*	Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+    				public void uncaughtException(Thread th, Throwable ex) {
+    					System.out.println("Exception while deleting " + ex);
+    				}
+    			};*/
+    			for (String nodes : SimpleDynamoProvider.nodesList) {
+    				
+    				String nodeValue = String.valueOf(Integer.parseInt(nodes) * 2);
+    				
+    				if (!nodeValue.equals(((SimpleDynamoApplication) getContext()
+    						.getApplicationContext()).myPort)) {
+    					
+    					Log.d(TAG,
+    							"sending delete request to "
+    									+ nodeValue
+    									+ "from"
+    									+ ((SimpleDynamoApplication) getContext()
+    											.getApplicationContext()).myPort);
+    					
+    					Message msgToSend = new Message();
+    					msgToSend.setMessageType(Message.DELETE_GLOBAL);
+    					msgToSend.setKey("");
+    					msgToSend.setValue("");
+    					msgToSend.setFromPort(((SimpleDynamoApplication) getContext()
+    							.getApplicationContext()).myPort);
+    					msgToSend
+    							.setSendToPort(String.valueOf(Integer.parseInt(nodes) * 2));
+
+    					Runnable task = new ClientClass(msgToSend);
+    					Thread t = new Thread(task);
+    					t.start();
+    					t.setUncaughtExceptionHandler(h);
+    				}
+    			}
     		}
     	}
     	else
     	{
-    		if(null!=selectionArgs)
+    	/*	if(null!=selectionArgs)
     		{
     			Log.d(TAG, "Delete key :"+selection+" at : "+((SimpleDynamoApplication) getContext()
     					.getApplicationContext()).myPort);
@@ -101,9 +147,9 @@ public class SimpleDynamoProvider extends ContentProvider {
     		}
     		else
     		{
-    			String primaryNode = correctNodePort(selection);
+  */  			String primaryNode = correctNodePort(selection);
         		deleteReplicatedMessage(primaryNode, selection);
-    		}
+    	//	}
     		
     	}
    
@@ -116,7 +162,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return null;
 	}
 
-	public String correctNodePort(String keyToStore) {
+	public static String correctNodePort(String keyToStore) {
 		String primaryNode = "";
 		try {
 
@@ -202,6 +248,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			msgToSend.setValue(values.getAsString(VALUE_FIELD) + ":");
 			msgToSend.setFromPort(((SimpleDynamoApplication) getContext()
 					.getApplicationContext()).myPort);
+			
 			msgToSend.setSendToPort(String.valueOf(Integer.parseInt(nodesList.get(index % nodesList.size()))*2));
 			index++;
 			Runnable task = new ClientClass(msgToSend);
@@ -213,12 +260,24 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	}
 	
+	private String nextNode(String primaryNode) {
+		// TODO Auto-generated method stub
+		
+		int index = nodesList.indexOf(String.valueOf((Integer.parseInt(primaryNode)/2)));
+		return String.valueOf(Integer.parseInt(nodesList.get((index+1) %nodesList.size()))*2) ;
+
+	}
+	
 	private long deleteReplicatedMessage(String primaryNode, String values) {
 		// TODO Auto-generated method stub
 		long id = 0;
+		Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+		    public void uncaughtException(Thread th, Throwable ex) {
+		        System.out.println("Caught exception in provider " + ex);
+		    }
+		};
 		int index = nodesList.indexOf(String.valueOf((Integer.parseInt(primaryNode)/2)));
 		for (int i = 0; i < 3; i++) {
-			Log.d(TAG,"sent to port: "+String.valueOf(Integer.parseInt(nodesList.get(index % nodesList.size()))*2)+"index: "+index);
 			Message msgToSend = new Message();
 			msgToSend.setMessageType(Message.DELETE);
 			msgToSend.setKey(values);
@@ -230,6 +289,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			Runnable task = new ClientClass(msgToSend);
 			Thread t = new Thread(task);
 			t.start();
+			t.setUncaughtExceptionHandler(h);
 		}
 		return id;
 
@@ -239,6 +299,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public boolean onCreate() {
 		// TODO Auto-generated method stub
 		dbHelper = new DBHelper(getContext());
+		writableDb = dbHelper.getWritableDatabase();
+		readableDb = dbHelper.getReadableDatabase();
 		nodesList.add("5554");
 		nodesList.add("5556");
 		nodesList.add("5558");
@@ -254,7 +316,6 @@ public class SimpleDynamoProvider extends ContentProvider {
             String sortOrder) {
         // TODO Auto-generated method stub
 		Cursor cursor;
-    	Log.d(TAG, "inside query : "+selection);
     	final String [] temp = {selection};
      	db = dbHelper.getReadableDatabase();
     		if(selection.compareTo("@")==0 )
@@ -266,6 +327,12 @@ public class SimpleDynamoProvider extends ContentProvider {
     		}
     		if(selection.compareTo("*")==0 )
     		{
+    			Thread.UncaughtExceptionHandler h = new Thread.UncaughtExceptionHandler() {
+    			    public void uncaughtException(Thread th, Throwable ex) {
+    			       ServerClass.globalQueryIteration--;
+    			       Log.d(TAG, "reducing iteration by 1");
+    			    }
+    			};
     			ArrayList<Message> globalDump = new ArrayList<Message>();
     			cursor=db.query(TABLE_NAME, projection, null, null , null, null, null);
     			int keyIndex = cursor.getColumnIndex(KEY_FIELD);
@@ -278,56 +345,42 @@ public class SimpleDynamoProvider extends ContentProvider {
 					globalDump.add(msg);
 			        cursor.moveToNext();
 			    }
-    			final Message globalQuery =  new Message();
-    			globalQuery.setGlobalQuery(globalDump);
-    			globalQuery.setMessageType(Message.QUERY_GLOBAL);
-    			globalQuery.setFromPort(((SimpleDynamoApplication) getContext().getApplicationContext()).myPort);
-    			globalQuery.setSendToPort(((SimpleDynamoApplication) getContext().getApplicationContext()).getSuccessor());
-    			Thread t = new Thread() {
-				    public void run() {
-				    	try {
-							Log.d(TAG, "Routing Query to another machine");
-							Socket socket = null;
-							socket = new Socket(InetAddress.getByAddress(new byte[] { 10,
-									0, 2, 2 }), Integer.parseInt(((SimpleDynamoApplication) getContext()
-											.getApplicationContext()).getSuccessor()));
-							if(socket.isConnected())
-							{
-							ObjectOutputStream outToClient = new ObjectOutputStream(
-									socket.getOutputStream());
-							outToClient.writeObject(globalQuery);
-							socket.close();
-							}
-						} catch (UnknownHostException e) {
-							Log.e(TAG, "ClientTask UnknownHostException");
-						} catch (IOException e) {
-							Log.e(TAG, "ClientTask socket IOException" + e.toString());
-						}
-				    	while(((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor)
-				    	{
-				    		Log.d(TAG, "In while loop");
-				    		try {
-								sleep(10);
-							} catch (InterruptedException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-				    	}
-				    	
-				    	
-				    }
-				};
-				t.start();
-				try {
-					t.join();
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+    			for(String nodes: nodesList)
+    			{
+    				Log.d(TAG,"sending * to "+nodes+"from"+((SimpleDynamoApplication) getContext().getApplicationContext()).myPort);
+    				String nodeValue = String.valueOf(Integer.parseInt(nodes)*2);
+    				if(!nodeValue.equals(((SimpleDynamoApplication) getContext().getApplicationContext()).myPort))
+    				{
+    				final Message globalQuery =  new Message();
+        			globalQuery.setGlobalQuery(globalDump);
+        			globalQuery.setMessageType(Message.QUERY_GLOBAL);
+        			globalQuery.setFromPort(((SimpleDynamoApplication) getContext().getApplicationContext()).myPort);
+        			globalQuery.setSendToPort(String.valueOf(Integer.parseInt(nodes)*2));
+        			
+        			Runnable task = new ClientClass(globalQuery);
+        			Thread t = new Thread(task);
+        			t.start();
+        			t.setUncaughtExceptionHandler(h);
+    				}
+    			}
+    			
+			synchronized (this) {
+				
+			while(((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor)
+		    	{
+		    		Log.d(TAG, "In while loop");
+		    		try {
+						Thread.sleep(10);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+		    	}
 				Log.d(TAG, "In updating global cursor");
 				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
 				return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
 			}
+    		}
     		synchronized(this){
     			
     	cursor=db.query(TABLE_NAME, projection, "key=?"	, temp , null, null, null);
@@ -344,7 +397,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 				Thread t = new Thread() {
 				    public void run() {
 				    	try {
-							Log.d(TAG, "Routing Query to another machine");
 							Socket socket = null;
 							socket = new Socket(InetAddress.getByAddress(new byte[] { 10,
 									0, 2, 2 }), Integer.parseInt(correctNodePort(temp[0])));
@@ -359,30 +411,36 @@ public class SimpleDynamoProvider extends ContentProvider {
 							Log.e(TAG, "ClientTask UnknownHostException");
 						} catch (IOException e) {
 							Log.e(TAG, "ClientTask socket IOException" + e.toString());
+							
+							sendToNextNode();							
 						}
-				    	/*while(((SimpleDhtApplication) getContext().getApplicationContext()).waitingForCursor)
-				    	{
-				    		Log.d(TAG, "In while loop");
-				    		try {
-								sleep(10);
-							} catch (InterruptedException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-				    	}*/
-				    	
-				    	
+				       	
 				    }
+
+					private void sendToNextNode() {
+						// TODO Auto-generated method stub
+						try {
+							Socket socket = null;
+							socket = new Socket(InetAddress.getByAddress(new byte[] { 10,
+									0, 2, 2 }), Integer.parseInt(nextNode(correctNodePort(temp[0]))));
+							if(socket.isConnected())
+							{
+							ObjectOutputStream outToClient = new ObjectOutputStream(
+									socket.getOutputStream());
+							outToClient.writeObject(msgToSend);
+							socket.close();
+							}
+						} catch (UnknownHostException e) {
+							Log.e(TAG, "ClientTask UnknownHostException");
+						} catch (IOException e) {
+							Log.e(TAG, "ClientTask socket IOException" + e.toString());
+							
+						}
+					}
 				};
 				t.start();
 				
-				/*try {
-					t.join();
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}*/
-				synchronized(this){
+			synchronized(this){
 				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
 		    	while(((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor)
 		    	{
@@ -394,14 +452,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 						e.printStackTrace();
 					}
 		    	}
-				Log.d(TAG, "In updating gobal cursor");
 				((SimpleDynamoApplication) getContext().getApplicationContext()).waitingForCursor=true;
 				return ((SimpleDynamoApplication) getContext().getApplicationContext()).cursorFromSuccesor;
 				}
 			}
 			else
 			{
-				Log.d(TAG, "returning local cursor ");
 				return cursor;
 			}
     }
@@ -413,7 +469,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return 0;
 	}
 
-	private String genHash(String input) throws NoSuchAlgorithmException {
+	private static String genHash(String input) throws NoSuchAlgorithmException {
 		MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
 		byte[] sha1Hash = sha1.digest(input.getBytes());
 		Formatter formatter = new Formatter();

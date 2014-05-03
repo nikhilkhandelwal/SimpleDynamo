@@ -27,13 +27,14 @@ public class ClientClass implements Runnable {
 			ObjectOutputStream outToClient = new ObjectOutputStream(
 					socket.getOutputStream());
 			outToClient.writeObject(message);
-			
+			outToClient.close();
 			socket.close();
 			}
 		} catch (IOException e) {
-			Log.e(TAG, "ClientTask UnknownHostException");
+			Log.d(TAG,"Client Exception");
+			throw new RuntimeException();
 		} 
-		throw new RuntimeException();
+		
 	}
 
 	}

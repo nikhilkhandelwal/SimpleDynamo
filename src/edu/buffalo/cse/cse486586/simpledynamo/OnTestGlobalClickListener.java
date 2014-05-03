@@ -21,7 +21,7 @@ public class OnTestGlobalClickListener implements OnClickListener {
 
 	public OnTestGlobalClickListener(TextView _tv, ContentResolver _cr) {
 		mContentResolver = _cr;
-		mUri = buildUri("content", "edu.buffalo.cse.cse486586.simpledht.provider");
+		mUri = buildUri("content", "edu.buffalo.cse.cse486586.simpledynamo.provider");
 	}
 
 	private Uri buildUri(String scheme, String authority) {
