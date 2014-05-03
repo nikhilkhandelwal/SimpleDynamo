@@ -356,7 +356,12 @@ public class SimpleDynamoProvider extends ContentProvider {
         			globalQuery.setMessageType(Message.QUERY_GLOBAL);
         			globalQuery.setFromPort(((SimpleDynamoApplication) getContext().getApplicationContext()).myPort);
         			globalQuery.setSendToPort(String.valueOf(Integer.parseInt(nodes)*2));
-        			
+        			try {
+						Thread.sleep(20);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
         			Runnable task = new ClientClass(globalQuery);
         			Thread t = new Thread(task);
         			t.start();
@@ -394,6 +399,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 			msgToSend.setValue("");
 			msgToSend.setFromPort(((SimpleDynamoApplication) getContext()
 						.getApplicationContext()).myPort );
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 				Thread t = new Thread() {
 				    public void run() {
 				    	try {
@@ -419,6 +430,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					private void sendToNextNode() {
 						// TODO Auto-generated method stub
+				
 						try {
 							Socket socket = null;
 							socket = new Socket(InetAddress.getByAddress(new byte[] { 10,

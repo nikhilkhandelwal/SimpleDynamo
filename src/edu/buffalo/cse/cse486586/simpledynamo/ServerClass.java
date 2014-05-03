@@ -107,6 +107,12 @@ public class ServerClass implements Runnable {
 				}
 				if (obj.getMessageType() == Message.QUERY) {
 					Log.d(TAG, "query in server task, key: " + obj.getKey());
+					try {
+						Thread.sleep(20);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 					Thread t = new Thread() {
 						Message obj;
 
@@ -369,8 +375,8 @@ public class ServerClass implements Runnable {
 						recoveryQueryIterator++;
 					
 					
-					if (recoveryQueryIterator == 4) {
-						{
+				//	if (recoveryQueryIterator == 4) {
+						
 						for (Message msg : recoveryResult) {
 
 								String key = msg.getKey();
@@ -404,11 +410,11 @@ public class ServerClass implements Runnable {
 
 							}
 
-						}
+						
 						flag = true;
 						recoveryQueryIterator = 0;
 						recoveryResult.clear();
-					}
+					//}
 				}
 
 			} catch (Exception e) {
